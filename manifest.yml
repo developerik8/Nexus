@@ -1,0 +1,19 @@
+modules:
+  jira:issuePanel:
+    - key: nexus-mood-tracker-panel
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: Nexus Mood Tracker
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+app:
+  runtime:
+    name: nodejs20.x
+  id: ari:cloud:ecosystem::app/e91c8ab2-51fb-44c2-9cfb-d12e0e81fc75
