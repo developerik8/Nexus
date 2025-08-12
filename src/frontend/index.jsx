@@ -1,56 +1,123 @@
-import React, { useEffect, useState } from 'react';
-import ForgeReconciler, { Text } from '@forge/react';
+import React, { useEffect, useState, useCallback } from 'react';
+import ForgeReconciler, {
+  Text,
+  Button,
+  ButtonSet,
+  SectionMessage,
+  Heading,
+  Stack,
+  Grid,
+  Cell,
+  TextField,
+} from '@forge/react';
 import { invoke } from '@forge/bridge';
 
 const App = () => {
-  const [tips, setTips] = useState(null);
-  const [quote, setQuote] = useState(null);
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleString());
+  const [mood, setMood] = useState(null);
+  const [comment, setComment] = useState('');
+  const [moodHistory, setMoodHistory] = useState([]);
+  const [quote, setQuote] = useState('');
+  const [confirmationMessage, setConfirmationMessage] = useState('');
 
-  useEffect(() => {
-    // Fetch mood tips
-    invoke('getMoodTips').then(setTips);
-
-    // Fetch motivational quote
-    invoke('getMotivationalQuote').then(setQuote);
-
-    // Update the current time periodically
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleString());
-    }, 1000);
-
-    return () => clearInterval(timer);
+  const fetchMoodHistory = useCallback(async () => {
+    const history = await invoke('getMoodHistory');
+    setMoodHistory(history || []);
   }, []);
 
+  useEffect(() => {
+    invoke('getMotivationalQuote').then(setQuote);
+    fetchMoodHistory();
+  }, [fetchMoodHistory]);
+
+  const handleSetMood = async (selectedMood) => {
+    setMood(selectedMood);
+    await invoke('saveMood', { mood: selectedMood, comment });
+    setConfirmationMessage(`Your mood "${selectedMood}" has been saved!`);
+    setComment(''); // Clear the comment field
+    // Hide the confirmation message after 3 seconds
+    setTimeout(() => setConfirmationMessage(''), 3000);
+    // Refresh the history after saving a new mood
+    fetchMoodHistory();
+  };
+
+  const moodCounts = moodHistory.reduce((acc, entry) => {
+    acc[entry.mood] = (acc[entry.mood] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
-    <>
-      <Text>Welcome to the Nexus Mood Tracker!</Text>
-      <Text>Mood Tracker helps you track your emotions and stay motivated.</Text>
-      <Text>Current Date and Time: {currentTime}</Text>
+    <Stack space="space.200">
+      <SectionMessage title="A little motivation for you!" appearance="info">
+        <Text>{quote || 'Loading motivational quote...'}</Text>
+      </SectionMessage>
 
-      <Text>Your current mood is: Happy 😊</Text>
+      <Grid>
+        <Cell>
+          <Stack space="space.100">
+            <Heading as="h2">How are you feeling about this issue?</Heading>
+            <ButtonSet>
+              <Button text="Happy 😊" onClick={() => handleSetMood('Happy')} />
+              <Button text="Stressed 😓" onClick={() => handleSetMood('Stressed')} />
+              <Button text="Neutral 😐" onClick={() => handleSetMood('Neutral')} />
+              <Button text="Excited 😄" onClick={() => handleSetMood('Excited')} />
+              <Button text="Sad 😔" onClick={() => handleSetMood('Sad')} />
+            </ButtonSet>
+            <TextField
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Add a comment (optional)"
+            />
+            {confirmationMessage && (
+              <SectionMessage appearance="confirmation">
+                <Text>{confirmationMessage}</Text>
+              </SectionMessage>
+            )}
+          </Stack>
+        </Cell>
+      </Grid>
 
-      <Text>Mood 1</Text>
-      <Text>I am feeling great today! 😊</Text>
+      <Stack space="space.100">
+        <Heading as="h2">Mood History</Heading>
+        {moodHistory.length > 0 ? (
+          moodHistory.map((entry, index) => (
+            <Text key={index}>
+              - {new Date(entry.timestamp).toLocaleString()}: **{entry.mood}**
+              {entry.comment && ` - "${entry.comment}"`}
+            </Text>
+          ))
+        ) : (
+          <Text>No moods logged for this issue yet.</Text>
+        )}
+      </Stack>
 
-      <Text>Mood 2</Text>
-      <Text>Things are a bit stressful, but I'm managing. 😓</Text>
-
-      <Text>Mood 3</Text>
-      <Text>Everything feels neutral today. 😐</Text>
-
-      <Text>Mood 4</Text>
-      <Text>I'm so excited and full of energy! 😄</Text>
-
-      <Text>Mood 5</Text>
-      <Text>I'm feeling a bit sad, but it's okay. 😔</Text>
-
-      <Text>Mood Tips:</Text>
-      {tips ? tips.map((tip, index) => <Text key={index}>- {tip}</Text>) : <Text>Loading mood tips...</Text>}
-
-      <Text>Motivational Quote:</Text>
-      <Text>{quote ? `"${quote}"` : 'Loading motivational quote...'}</Text>
-    </>
+      <Stack space="space.100">
+        <Heading as="h2">Mood Visualization</Heading>
+        {Object.keys(moodCounts).length > 0 ? (
+          Object.entries(moodCounts).map(([mood, count]) => (
+            <Grid key={mood}>
+              <Cell>
+                <Text>{mood}</Text>
+              </Cell>
+              <Cell>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      width: `${count * 20}px`, // Simple scaling for the bar
+                      height: '20px',
+                      backgroundColor: '#4c9aff',
+                      borderRadius: '3px',
+                    }}
+                  />
+                  <Text>&nbsp;({count})</Text>
+                </div>
+              </Cell>
+            </Grid>
+          ))
+        ) : (
+          <Text>No data to visualize yet.</Text>
+        )}
+      </Stack>
+    </Stack>
   );
 };
 
